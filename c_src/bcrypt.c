@@ -164,24 +164,33 @@ bcrypt(char * encrypted, const char *key, const char *salt)
 
 	/* Check for minor versions */
 	if (salt[1] != '$') {
-		 switch (salt[1]) {
+		 switch ((minor = salt[1])) {
 		 case 'a':
-			 /* 'ab' should not yield the same as 'abab' */
-			 minor = salt[1];
-			 salt++;
+       		 key_len = (u_int8_t)(strlen(key) + 1);
+			 break;
+	     case 'b':
+	     case 'x':
+	     case 'y':
+			 /* strlen() returns a size_t, but the function calls
+			  * below result in implicit casts to a narrower integer
+			  * type, so cap key_len at the actual maximum supported
+			  * length here to avoid integer wraparound */
+			 key_len = strlen(key);
+			 if (key_len > 72)
+			     key_len = 72;
+			 key_len++; /* include the NUL */
 			 break;
 		 default:
 			 return ERROR;
 		 }
-	} else
-		 minor = 0;
-
-	/* Discard version + "$" identifier */
-	salt += 2;
-
-	if (salt[2] != '$')
+	}
+	
+    if (salt[2] != '$')
 		/* Out of sync with passwd entry */
 		return ERROR;
+
+	/* Discard version + "$" identifier */
+	salt += 3;	
 
 	/* Computer power doesn't increase linear, 2^x should be fine */
 	n = atoi(salt);
@@ -200,7 +209,6 @@ bcrypt(char * encrypted, const char *key, const char *salt)
 	/* We dont want the base64 salt but the raw data */
 	decode_base64(csalt, BCRYPT_MAXSALT, (u_int8_t *) salt);
 	salt_len = BCRYPT_MAXSALT;
-	key_len = strlen(key) + (minor >= 'a' ? 1 : 0);
 
 	/* Setting up S-Boxes and Subkeys */
 	Blowfish_initstate(&state);
@@ -231,17 +239,10 @@ bcrypt(char * encrypted, const char *key, const char *salt)
 	}
 
 
-	i = 0;
-	encrypted[i++] = '$';
-	encrypted[i++] = BCRYPT_VERSION;
-	if (minor)
-		encrypted[i++] = minor;
-	encrypted[i++] = '$';
+	snprintf(encrypted, 8, "$2%c$%2.2u$", minor, logr);
 
-	snprintf(encrypted + i, 4, "%2.2u$", logr);
-
-	encode_base64((u_int8_t *) encrypted + i + 3, csalt, BCRYPT_MAXSALT);
-	encode_base64((u_int8_t *) encrypted + strlen(encrypted), ciphertext,
+	encode_base64((u_int8_t *) encrypted + 7, csalt, BCRYPT_MAXSALT);
+	encode_base64((u_int8_t *) encrypted + 29, ciphertext,
 	    4 * BCRYPT_BLOCKS - 1);
 	memset(&state, 0, sizeof(state));
 	memset(ciphertext, 0, sizeof(ciphertext));
