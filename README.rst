@@ -56,6 +56,10 @@ application's environment:
   `Note: the NIF implementation no longer blocks the Erlang VM
   scheduler threads`
 
+  `Note: We have delete the 'prot' mechanism after 0.5.4 for some
+  compiling error on OTP 23. if you want to re-introduce it, please see
+  'backup_bcrypt_port branch' - EMQ X Team`
+
 ``pool_size``
   Specifies the size of the port program pool. Defaults to ``4``.
 

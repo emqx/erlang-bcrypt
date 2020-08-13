@@ -106,7 +106,7 @@
 	}]
    ).
 
-start_with(Mechanism) when Mechanism =:= nif; Mechanism =:= port ->
+start_with(Mechanism) when Mechanism =:= nif ->
     application:start(crypto),
     case application:load(bcrypt) of
         {error, {already_loaded, bcrypt}} -> ok;
@@ -118,7 +118,10 @@ start_with(Mechanism) when Mechanism =:= nif; Mechanism =:= port ->
             ok = application:stop(bcrypt),
             ok = application:start(bcrypt);
         ok -> ok
-    end.
+    end;
+
+start_with(Mechanism) when Mechanism =:= port ->
+    error(removed_port_mechanism).
 
 simple_nif_test_() ->
     {setup, fun() -> ok = start_with(nif) end,
@@ -135,17 +138,20 @@ pair_nif_test_() ->
      [?_assert({ok, Hash} =:= bcrypt:hashpw(Pass, Salt)) ||
          {Pass, Salt, Hash} <- ?PAIRS]}.
 
-simple_port_test_() ->
-    {setup, fun() -> ok = start_with(port) end,
-     [{timeout, 1000,
-       fun() ->
-               {ok, Salt} = bcrypt:gen_salt(),
-               {ok, Hash} = bcrypt:hashpw("foo", Salt),
-               ?assert({ok, Hash} =:= bcrypt:hashpw("foo", Hash)),
-               ?assertNot({ok, Hash} =:= bcrypt:hashpw("bar", Hash))
-       end}]}.
-
-pair_port_test_() ->
-    {setup, fun() -> ok = start_with(port) end,
-     [?_assert({ok, Hash} =:= bcrypt:hashpw(Pass, Salt)) ||
-         {Pass, Salt, Hash} <- ?PAIRS]}.
+%% The following use cases are correct.
+%% They are temporarily commented out,
+%% as we have removed support for the port mechanism.
+% simple_port_test_() ->
+%     {setup, fun() -> ok = start_with(port) end,
+%      [{timeout, 1000,
+%        fun() ->
+%                {ok, Salt} = bcrypt:gen_salt(),
+%                {ok, Hash} = bcrypt:hashpw("foo", Salt),
+%                ?assert({ok, Hash} =:= bcrypt:hashpw("foo", Hash)),
+%                ?assertNot({ok, Hash} =:= bcrypt:hashpw("bar", Hash))
+%        end}]}.
+%
+% pair_port_test_() ->
+%     {setup, fun() -> ok = start_with(port) end,
+%      [?_assert({ok, Hash} =:= bcrypt:hashpw(Pass, Salt)) ||
+%          {Pass, Salt, Hash} <- ?PAIRS]}.
