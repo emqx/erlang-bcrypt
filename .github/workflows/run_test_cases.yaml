@@ -4,35 +4,13 @@ on: [push, pull_request]
 
 jobs:
 
-  windows:
-    runs-on: windows-latest
-
-    steps:
-    - uses: actions/checkout@v1
-    - uses: ilammy/msvc-dev-cmd@v1
-    - name: run eunit
-      run: |
-        set-executionpolicy remotesigned -s cu
-        iex (new-object net.webclient).downloadstring('https://get.scoop.sh')
-        $env:path + ";" + $env:USERPROFILE + "\scoop\shims"
-        scoop bucket add extras https://github.com/lukesampson/scoop-extras.git
-        scoop bucket add java
-        scoop update
-        scoop install sudo curl 7zip ojdkbuild8 vcredist2013
-        scoop install erlang@22.3
-
-        $rebar3 = $env:USERPROFILE + "\rebar3"
-        (New-Object System.Net.WebClient).DownloadFile('https://s3.amazonaws.com/rebar3/rebar3', $rebar3)
-        escript $rebar3 eunit
-
   mac:
     runs-on: macos-latest
 
     steps:
-    - uses: actions/checkout@v1
+    - uses: actions/checkout@v3
     - name: prepare
       run: |
-        /usr/bin/ruby -e "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install)"
         brew install curl zip unzip gnu-sed erlang openssl@1.1
         echo "/usr/local/bin:$PATH" >> ~/.bashrc
     - name: install rebar3
@@ -49,38 +27,35 @@ jobs:
 
     strategy:
       matrix:
+        builder:
+          - 5.0-33
+        otp:
+          - 24.3.4.2-3
+        elixir:
+          - 1.13.4
+        arch:
+          - amd64
+          - arm64
         os: 
-          - ubuntu18.04 
-          - ubuntu16.04 
-          - ubuntu14.04 
+          - ubuntu22.04
+          - ubuntu20.04
+          - ubuntu18.04
+          - ubuntu16.04
+          - debian11
           - debian10
-          - debian9 
-          - debian8 
-          - opensuse
-          - centos7 
-          - centos6
-          - raspbian10
-          - raspbian9
-          - raspbian8
-  
+          - debian9
+          - el9
+          - el8
+          - el7
+          - amzn2
+
     steps:
-    - uses: actions/checkout@v1
+    - uses: actions/checkout@v3
+    - uses: docker/setup-buildx-action@v2
+    - uses: docker/setup-qemu-action@v2
+      with:
+        platforms: ${{ matrix.arch }}
     - name: run eunit
-      env:
-        ERL_OTP: erl22.3
-        SYSTEM: ${{ matrix.os }}
       run: |
-        version=$(echo ${{ github.ref }} | sed -r  "s .*/.*/(.*) \1 g")
-        sudo docker run --rm --privileged multiarch/qemu-user-static:register --reset
-        sudo docker run -i --name $SYSTEM -v $(pwd):/bcrypt emqx/build-env:$ERL_OTP-$SYSTEM sh -c "cd /bcrypt && rebar3 eunit"
-
-  docker:
-    runs-on: ubuntu-latest
-
-    steps:
-    - uses: actions/checkout@v1
-    - name: run eunit
-      env:
-        ERL_OTP: erl22.3
-      run: docker run -i --name alpine -v $(pwd):/bcrypt emqx/build-env:$ERL_OTP-alpine-amd64 sh -c "cd /bcrypt && rebar3 eunit"
-    
+        IMAGE=ghcr.io/emqx/emqx-builder/${{ matrix.builder }}:${{ matrix.elixir }}-${{ matrix.otp }}-${{ matrix.os }}
+        docker run --rm -v $(pwd):/wd --workdir /wd --platform=linux/${{ matrix.arch }} $IMAGE bash -euc 'make eunit'
