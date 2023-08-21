@@ -133,6 +133,37 @@ simple_nif_test_() ->
                ?assertNot({ok, Hash} =:= bcrypt:hashpw("bar", Hash))
        end}]}.
 
+nif_worker_not_started_test_() ->
+    {setup,
+        fun() -> _ = application:stop(bcrypt) end,
+        [{timeout,
+          1000,
+          fun() ->
+            {ok, Salt} = bcrypt:gen_salt(),
+            ?assertEqual({error, not_started}, bcrypt:hashpw("foo", Salt))
+          end}]}.
+
+nif_worker_crash_test_() ->
+    {setup,
+        fun() ->
+            ok = start_with(nif),
+            {ok, Salt} = bcrypt:gen_salt(),
+            meck:new(bcrypt_nif, [passthrough]),
+            meck:expect(bcrypt_nif, hashpw,
+                        fun(_, _, _, _, _) -> meck:exception(error, oops) end),
+            Salt
+        end,
+        fun(_) ->
+            meck:unload(bcrypt_nif)
+        end,
+        fun(Salt) ->
+            [{timeout,
+            1000,
+            fun() ->
+                ?assertMatch({error, _}, bcrypt:hashpw("foo", Salt))
+            end}]
+        end}.
+
 pair_nif_test_() ->
     {setup, fun() -> ok = start_with(nif) end,
      [?_assert({ok, Hash} =:= bcrypt:hashpw(Pass, Salt)) ||
