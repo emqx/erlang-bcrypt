@@ -28,18 +28,18 @@ jobs:
     strategy:
       matrix:
         builder:
-          - 5.3-3
+          - 5.4-4
         otp:
-          - 26.2.3-1
+          - 27.2-2
         elixir:
-          - 1.15.7
+          - 1.17.3
         arch:
           - amd64
           - arm64
-        os: 
+        os:
+          - ubuntu24.04
           - ubuntu22.04
           - ubuntu20.04
-          - ubuntu18.04
           - debian12
           - debian11
           - debian10
